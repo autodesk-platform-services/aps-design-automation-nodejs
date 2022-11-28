@@ -196,7 +196,7 @@ router.get('/appbundles', async /*GetLocalBundles*/(req, res) => {
 /// <summary>
 /// Return a list of available engines
 /// </summary>
-router.get('/forge/designautomation/engines', async /*GetAvailableEngines*/(req, res) => {
+router.get('/aps/designautomation/engines', async /*GetAvailableEngines*/(req, res) => {
     let that = this;
     let Allengines = [];
     let paginationToken = null;
@@ -219,7 +219,7 @@ router.get('/forge/designautomation/engines', async /*GetAvailableEngines*/(req,
 /// <summary>
 /// Define a new appbundle
 /// </summary>
-router.post('/forge/designautomation/appbundles', async /*CreateAppBundle*/(req, res) => {
+router.post('/aps/designautomation/appbundles', async /*CreateAppBundle*/(req, res) => {
     const appBundleSpecs = req.body;
 
     // basic input validation
@@ -348,7 +348,7 @@ router.post('/forge/designautomation/appbundles', async /*CreateAppBundle*/(req,
 /// <summary>
 /// CreateActivity a new Activity
 /// </summary>
-router.post('/forge/designautomation/activities', async /*CreateActivity*/(req, res) => {
+router.post('/aps/designautomation/activities', async /*CreateActivity*/(req, res) => {
     const activitySpecs = req.body;
 
     // basic input validation
@@ -450,7 +450,7 @@ router.post('/forge/designautomation/activities', async /*CreateActivity*/(req, 
 /// <summary>
 /// Get all Activities defined for this account
 /// </summary>
-router.get('/forge/designautomation/activities', async /*GetDefinedActivities*/(req, res) => {
+router.get('/aps/designautomation/activities', async /*GetDefinedActivities*/(req, res) => {
     const api = await Utils.dav3API(req.oauth_token);
     // filter list of 
     let activities = null;
@@ -495,7 +495,7 @@ const prepareOutputUrl = async (bucketKey, objectKey, opts, oAuthClient, oAuthTo
 /// <summary>
 /// Start a new workitem
 /// </summary>
-router.post('/forge/designautomation/workitems', multer({
+router.post('/aps/designautomation/workitems', multer({
     dest: 'uploads/'
 }).single('inputFile'), async /*StartWorkitem*/(req, res) => {
     const input = req.body;
@@ -592,7 +592,7 @@ router.post('/forge/designautomation/workitems', multer({
 
     // prepare & submit workitem
     // the callback contains the connectionId (used to identify the client) and the outputFileName of this workitem
-    const callbackUrl = `${config.credentials.webhook_url}/api/forge/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}&uploadKey=${s3UploadObject.uploadKey}`;
+    const callbackUrl = `${config.credentials.webhook_url}/api/aps/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}&uploadKey=${s3UploadObject.uploadKey}`;
     const workItemSpec = {
         activityId: activityName,
         arguments: {
@@ -623,7 +623,7 @@ router.post('/forge/designautomation/workitems', multer({
 /// <summary>
 /// Callback from Design Automation Workitem (onProgress or onComplete)
 /// </summary>
-router.post('/forge/callback/designautomation', async /*OnCallback*/(req, res) => {
+router.post('/aps/callback/designautomation', async /*OnCallback*/(req, res) => {
     // your webhook should return immediately! we could use Hangfire to schedule a job instead
     // ALWAYS return ok (200)
     res.status(200).end();
@@ -687,7 +687,7 @@ router.post('/forge/callback/designautomation', async /*OnCallback*/(req, res) =
 /// <summary>
 /// Clear the accounts (for debugging purpouses)
 /// </summary>
-router.delete('/forge/designautomation/account', async /*ClearAccount*/(req, res) => {
+router.delete('/aps/designautomation/account', async /*ClearAccount*/(req, res) => {
     let api = await Utils.dav3API(req.oauth_token);
     // clear account
     await api.deleteForgeApp('me');

@@ -10,8 +10,8 @@ $(document).ready(function () {
 });
 
 function prepareLists() {
-    list('activity', '/api/forge/designautomation/activities');
-    list('engines', '/api/forge/designautomation/engines');
+    list('activity', '/api/aps/designautomation/activities');
+    list('engines', '/api/aps/designautomation/engines');
     list('localBundles', '/api/appbundles');
 }
 
@@ -38,12 +38,12 @@ function list(control, endpoint) {
 
 function clearAccount() {
     if (!confirm('Clear existing activities & appbundles before start. ' +
-            'This is useful if you believe there are wrong settings on your account.' +
-            '\n\nYou cannot undo this operation. Proceed?'))
+        'This is useful if you believe there are wrong settings on your account.' +
+        '\n\nYou cannot undo this operation. Proceed?'))
         return;
 
     jQuery.ajax({
-        url: 'api/forge/designautomation/account',
+        url: 'api/aps/designautomation/account',
         method: 'DELETE',
         success: function () {
             prepareLists();
@@ -70,7 +70,7 @@ function createAppBundleActivity() {
 
 function createAppBundle(cb) {
     jQuery.ajax({
-        url: 'api/forge/designautomation/appbundles',
+        url: 'api/aps/designautomation/appbundles',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
@@ -90,7 +90,7 @@ function createAppBundle(cb) {
 
 function createActivity(cb) {
     jQuery.ajax({
-        url: 'api/forge/designautomation/activities',
+        url: 'api/aps/designautomation/activities',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
@@ -128,7 +128,7 @@ function startWorkitem() {
         }));
         writeLog('Uploading input file...');
         $.ajax({
-            url: 'api/forge/designautomation/workitems',
+            url: 'api/aps/designautomation/workitems',
             data: formData,
             processData: false,
             contentType: false,
@@ -161,7 +161,7 @@ function startConnection(onReady) {
         return;
     }
     connection = io();
-    connection.on('connect', function() {
+    connection.on('connect', function () {
         connectionId = connection.id;
         if (onReady)
             onReady();
@@ -177,7 +177,7 @@ function startConnection(onReady) {
 
     connection.on('onComplete', function (message) {
         if (typeof message === 'object')
-            message =JSON.stringify(message, null, 2);
+            message = JSON.stringify(message, null, 2);
         writeLog(message);
     });
 }

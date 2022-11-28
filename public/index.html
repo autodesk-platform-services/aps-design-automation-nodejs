@@ -2,9 +2,9 @@
 <html>
 
 <head>
-    <title>Autodesk Forge - Design Automation</title>
+    <title>APS - Design Automation</title>
     <meta charset="utf-8" />
-    <link rel="shortcut icon" href="https://github.com/Autodesk-Forge/learn.forge.viewhubmodels/raw/master/img/favicon.ico">
+    <link rel="shortcut icon" href="https://cdn.autodesk.io/favicon.ico">
     <!-- Common packages: jQuery, Bootstrap -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
@@ -12,7 +12,7 @@
     <!-- Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
     <!-- Files for this project -->
-    <script src="/js/ForgeDesignAutomation.js"></script>
+    <script src="/js/ApsDesignAutomation.js"></script>
 </head>
 
 <body style="height: 100%;">
@@ -21,15 +21,16 @@
         <div class="container-fluid">
             <ul class="nav navbar-nav left">
                 <li>
-                    <a href="http://developer.autodesk.com" target="_blank">
-                        <img alt="Autodesk Forge" src="//developer.static.autodesk.com/images/logo_forge-2-line.png"
-                            height="20">
+                    <a href="http://tutorials.autodesk.io" target="_blank">
+                        <img alt="Autodesk APS" src="https://cdn.autodesk.io/logo/black/stacked.png" height="20">
                     </a>
                 </li>
             </ul>
             <div style="float: right; margin-top: 15px; cursor: pointer;">
-                <span style="padding-right: 5px;" data-toggle="modal" data-target="#defineActivityModal" title="Configura AppBundle & Activity"><span
-                        class="glyphicon glyphicon-cog glyphiconTop mlink"> </span> Configure</span>
+                <span style="padding-right: 5px;" data-toggle="modal" data-target="#defineActivityModal"
+                    title="Configura AppBundle & Activity">
+                    <span class="glyphicon glyphicon-cog glyphiconTop mlink"> </span> Configure
+                </span>
             </div>
         </div>
     </nav>
@@ -66,11 +67,15 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Cancel"><span aria-hidden="true">&times;</span></button>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Cancel"><span
+                            aria-hidden="true">&times;</span></button>
                     <h4 class="modal-title" id="myModalLabel">Create/Update AppBundle & Activity</h4>
                 </div>
                 <div class="modal-body">
-                  <div class="alert alert-warning"><center>Define AppBundle &amp; Activity only once.<br />Redefine only when your plugin code change (creates a new version).</center></div>
+                    <div class="alert alert-warning">
+                        <center>You just need to define AppBundle &amp; Activity once.<br />If the plugin code changed,
+                            redefine (creates a new version).</center>
+                    </div>
                     <div class="form-group">
                         <label for="localBundles">Select a local AppBundle:</label>
                         <select class="form-control" id="localBundles"> </select>
