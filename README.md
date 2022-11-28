@@ -19,6 +19,8 @@ See other projects for bundles.
 
 ## Thumbnail
 
+https://user-images.githubusercontent.com/6602398/204223085-41b11c3d-0d4b-4ae2-a7f6-d0038f74ecd1.mp4
+
 ### Setup
 
 To use this sample, you will need Autodesk developer credentials. Visit the [APS Developer Portal](https://developer.autodesk.com), sign up for an account, then [create an app](https://developer.autodesk.com/myapps/create). For this new app, use `http://localhost:8080/api/aps/callback/oauth` as the Callback URL, although it is not used on a 2-legged flow. Finally, take note of the **Client ID** and **Client Secret**.
