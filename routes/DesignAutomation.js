@@ -473,25 +473,37 @@ router.get('/aps/designautomation/activities', async /*GetDefinedActivities*/(re
 });
 
 /// <summary>
-/// Direct To S3
+/// Direct To S3 
+/// ref : https://aps.autodesk.com/blog/new-feature-support-direct-s3-migration-inputoutput-files-design-automation
 /// </summary>
-const prepareInputUrl = async (bucketKey, objectKey, opts, oAuthClient, oAuthToken) => {
-    let objectS3Download = await new ForgeAPI.ObjectsApi().getS3DownloadURL(bucketKey, objectKey,
-        opts,
-        oAuthClient, oAuthToken);
-    return (objectS3Download.body.url);
 
+const getObjectId = async (bucketKey, objectKey, req) => {
+    try {
+        let contentStream = _fs.createReadStream(req.file.path);
+        let uploadResponse = await new ForgeAPI.ObjectsApi().uploadResources(
+            bucketKey,
+            {
+                objectKey: objectKey,
+                data: contentStream,
+                length: req.file.size
+            },
+            {
+                useAcceleration: false,
+                minutesExpiration: 20,
+                onUploadProgress: (data) => console.warn(data)
+            },
+            req.oauth_client, req.oauth_token,
+        );
+        console.log(uploadResponse[0].completed.objectId);
+        return (uploadResponse[0].completed.objectId);
+    } catch (ex) {
+        console.error(ex);
+        return (res.status(500).json({
+            diagnostic: 'Failed to upload file for workitem'
+        }));
+    }
 }
-const prepareOutputUrl = async (bucketKey, objectKey, opts, oAuthClient, oAuthToken) => {
 
-    let objectS3Upload = await new ForgeAPI.ObjectsApi().getS3UploadURL(bucketKey, objectKey,
-        opts,
-        oAuthClient, oAuthToken);
-    return ({
-        outputUrl: objectS3Upload.body.urls[0],
-        uploadKey: objectS3Upload.body.uploadKey
-    });
-}
 /// <summary>
 /// Start a new workitem
 /// </summary>
@@ -510,7 +522,6 @@ router.post('/aps/designautomation/workitems', multer({
     // save the file on the server
     const ContentRootPath = _path.resolve(_path.join(__dirname, '../..'));
     const fileSavePath = _path.join(ContentRootPath, _path.basename(req.file.originalname));
-    //const stream = _fs.createReasStream(fileSavePath, FileMode.Create)) await input.inputFile.CopyToAsync(stream);
 
     // upload file to OSS Bucket
     // 1. ensure bucket existis
@@ -525,38 +536,12 @@ router.post('/aps/designautomation/workitems', multer({
     }
     // 2. upload inputFile
     const inputFileNameOSS = `${new Date().toISOString().replace(/[-T:\.Z]/gm, '').substring(0, 14)}_input_${_path.basename(req.file.originalname)}`; // avoid overriding
-    try {
-        let contentStream = _fs.createReadStream(req.file.path);
-        await new ForgeAPI.ObjectsApi().uploadResources(
-            bucketKey,
-            {
-                objectKey: inputFileNameOSS,
-                data: contentStream,
-                length: req.file.size
-            },
-            {
-                useAcceleration: false,
-                minutesExpiration: 20,
-                onUploadProgress: (data) => console.warn(data)
-            },
-            req.oauth_client, req.oauth_token,
-        );
-    } catch (ex) {
-        console.error(ex);
-        return (res.status(500).json({
-            diagnostic: 'Failed to upload file for workitem'
-        }));
-    }
-
     // prepare workitem arguments
+    const bearerToken = ["Bearer", req.oauth_token.access_token].join(" ");
     // 1. input file
     const inputFileArgument = {
-        url: await prepareInputUrl(bucketKey, inputFileNameOSS,
-            {
-                useAcceleration: false,
-                minutesExpiration: 60/*intentionaly kept max duration, this url will be sent to DA service*/
-            },
-            req.oauth_client, req.oauth_token)
+        url: await getObjectId(bucketKey, inputFileNameOSS, req),
+        headers: { "Authorization": bearerToken }
     };
     // 2. input json
     const inputJson = {
@@ -567,32 +552,16 @@ router.post('/aps/designautomation/workitems', multer({
         url: "data:application/json, " + JSON.stringify(inputJson).replace(/"/g, "'")
     };
     // 3. output file
-    const outputFileNameOSS = `${new Date().toISOString().replace(/[-T:\.Z]/gm, '').substring(0, 14)}_output_${_path.basename(req.file.originalname)}`; // avoid overriding
-    let signedUrl = null;
-    let s3UploadObject = null;
-    try {
-        // write signed resource requires the object to already exist :(
-        s3UploadObject = await prepareOutputUrl(bucketKey, outputFileNameOSS,
-            {
-                useAcceleration: false,
-                minutesExpiration: 60/*intentionaly kept max duration, this url will be sent to DA service*/
-            },
-            req.oauth_client, req.oauth_token);
-        signedUrl = s3UploadObject.outputUrl;
-    } catch (ex) {
-        console.error(ex);
-        return (res.status(500).json({
-            diagnostic: 'Failed to create a signed URL for output file'
-        }));
-    }
+    const outputFileNameOSS = `${new Date().toISOString().replace(/[-T:\.Z]/gm, '').substring(0, 14)}_output_${_path.basename(req.file.originalname)}`; // avoid overriding  
     const outputFileArgument = {
-        url: signedUrl,
+        url: await getObjectId(bucketKey, outputFileNameOSS, req),
         verb: dav3.Verb.put,
+        headers: { "Authorization": bearerToken }
     };
 
     // prepare & submit workitem
     // the callback contains the connectionId (used to identify the client) and the outputFileName of this workitem
-    const callbackUrl = `${config.credentials.webhook_url}/api/aps/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}&uploadKey=${s3UploadObject.uploadKey}`;
+    const callbackUrl = `${config.credentials.webhook_url}/api/aps/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}`;
     const workItemSpec = {
         activityId: activityName,
         arguments: {
@@ -649,17 +618,11 @@ router.post('/aps/callback/designautomation', async /*OnCallback*/(req, res) => 
                 });
             }
         );
-        //socketIO.to(req.query.id).emit('downloadReport', bodyJson.reportUrl);
 
         const objectsApi = new ForgeAPI.ObjectsApi();
         const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
         if (bodyJson.status === 'success') {
             try {
-                //Complete the upload to S3
-                await objectsApi.completeS3Upload(bucketKey, req.query.outputFileName,
-                    { uploadKey: req.query.uploadKey },
-                    { useAcceleration: false, minutesExpiration: 2 },
-                    req.oauth_client, req.oauth_token);
                 //create a S3 presigned URL and send to client
                 let response = await objectsApi.getS3DownloadURL(bucketKey, req.query.outputFileName,
                     { useAcceleration: false, minutesExpiration: 15 },
