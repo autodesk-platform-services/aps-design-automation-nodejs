@@ -480,27 +480,35 @@ router.get('/aps/designautomation/activities', async /*GetDefinedActivities*/(re
 const getObjectId = async (bucketKey, objectKey, req) => {
     try {
         let contentStream = _fs.createReadStream(req.file.path);
+
+        //uploadResources takes an Object or Object array of resource to uplaod with their parameters,
+        //we are just passing only one object.
         let uploadResponse = await new ForgeAPI.ObjectsApi().uploadResources(
             bucketKey,
+            [
+                //object
+                {
+                    objectKey: objectKey,
+                    data: contentStream,
+                    length: req.file.size
+                }
+            ],
             {
-                objectKey: objectKey,
-                data: contentStream,
-                length: req.file.size
-            },
-            {
-                useAcceleration: false,
-                minutesExpiration: 20,
-                onUploadProgress: (data) => console.warn(data)
+                useAcceleration: false, //Whether or not to generate an accelerated signed URL
+                minutesExpiration: 20, //The custom expiration time within the 1 to 60 minutes range, if not specified, default is 2 minutes
+                onUploadProgress: (data) => console.warn(data) // function (progressEvent) => {}
             },
             req.oauth_client, req.oauth_token,
         );
+        //lets check for the first and only entry.
+        if (uploadResponse[0].hasOwnProperty('error') && uploadResponse[0].error) {
+            throw new Error(uploadResponse[0].completed.reason);
+        }
         console.log(uploadResponse[0].completed.objectId);
         return (uploadResponse[0].completed.objectId);
     } catch (ex) {
-        console.error(ex);
-        return (res.status(500).json({
-            diagnostic: 'Failed to upload file for workitem'
-        }));
+        console.error("Failed to create ObjectID\n", ex)
+        throw ex;
     }
 }
 
@@ -636,8 +644,9 @@ router.post('/aps/callback/designautomation', async /*OnCallback*/(req, res) => 
 
         // delete the input file (we do not need it anymore)
         try {
-            /*await*/
-            objectsApi.deleteObject(bucketKey, req.query.inputFileName, req.oauth_client, req.oauth_token);
+
+            await objectsApi.deleteObject(bucketKey, req.query.inputFileName, req.oauth_client, req.oauth_token);
+
         } catch (ex) {
             console.error(ex);
         }
