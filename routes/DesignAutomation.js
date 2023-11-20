@@ -593,7 +593,7 @@ router.post('/aps/designautomation/workitems', multer({
 });
 
 async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConnectionId, outputFileName, inputFileName) {
-    const id = setInterval(async () => {
+    const checkStatus = async () => {
         const socketIO = require('../server').io;
         try {
             const api = await Utils.dav3API(oauthToken);
@@ -602,11 +602,11 @@ async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConne
             const objectsApi = new ForgeAPI.ObjectsApi();
             socketIO.to(browserConnectionId).emit('onComplete', status);
             if (status.status == 'pending' || status.status === 'inprogress') {
+                setTimeout(checkStatus, 2000);
                 return;
             }
             let response = await fetch(status.reportUrl);
             socketIO.to(browserConnectionId).emit('onComplete', await response.text());
-            clearInterval(id);
             if (status.status === 'success') {
                 response = await objectsApi.getS3DownloadURL(bucketKey, outputFileName, { 
                     useAcceleration: false, minutesExpiration: 15 
@@ -620,7 +620,9 @@ async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConne
             console.error(err);
             socketIO.to(browserConnectionId).emit('onError', err);
         }
-    }, 2000);
+    };
+
+    setTimeout(checkStatus, 2000);
 }
 
 /// <summary>
