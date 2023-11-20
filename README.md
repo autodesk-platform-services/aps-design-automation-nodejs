@@ -25,14 +25,6 @@ https://user-images.githubusercontent.com/6602398/204223085-41b11c3d-0d4b-4ae2-a
 
 To use this sample, you will need Autodesk developer credentials. Visit the [APS Developer Portal](https://developer.autodesk.com), sign up for an account, then [create an app](https://developer.autodesk.com/myapps/create). For this new app, use `http://localhost:8080/api/aps/callback/oauth` as the Callback URL, although it is not used on a 2-legged flow. Finally, take note of the **Client ID** and **Client Secret**.
 
-**ngrok**
-
-When a `Workitem` completes, **Design Automation** can notify our application. As the app is running locally (i.e. `localhost`), it's not reacheable from the internet. `ngrok` tool creates a temporary address that channels notifications to our `localhost` address.
-
-After [download ngrok](https://ngrok.com/), run `ngrok http 3000 -host-header="localhost:3000"`, then copy the `http` address into the `APS_WEBHOOK_URL` environment variable (see next). For this sample, do not use the `https` address.
-
-![](media/ngrok_setup.png)
-
 ## Running locally
 
 Install [NodeJS](https://nodejs.org).
@@ -48,7 +40,6 @@ Mac OSX/Linux (Terminal)
     npm install
     export APS_CLIENT_ID=<<YOUR CLIENT ID FROM DEVELOPER PORTAL>>
     export APS_CLIENT_SECRET=<<YOUR CLIENT SECRET>>
-    export APS_WEBHOOK_URL=<<YOUR NGROK URL>>
     npm start
 
 Windows (use **Node.js command line** from the Start menu)
@@ -56,7 +47,6 @@ Windows (use **Node.js command line** from the Start menu)
     npm install
     set APS_CLIENT_ID=<<YOUR CLIENT ID FROM DEVELOPER PORTAL>>
     set APS_CLIENT_SECRET=<<YOUR CLIENT SECRET>>
-    set APS_WEBHOOK_URL=<<YOUR NGROK URL>>
     npm start
 
 Open the browser: [http://localhost:8080](http://localhost:8080).
@@ -96,7 +86,6 @@ Here is the launch configuration generated for Node.js debugging
             "env": {
                 "APS_CLIENT_ID": "your clientid here",
                 "APS_CLIENT_SECRET": "your client secret here",
-                "APS_WEBHOOK_URL": "your ngrok url here"
             }
         }
     ]

@@ -568,24 +568,19 @@ router.post('/aps/designautomation/workitems', multer({
     };
 
     // prepare & submit workitem
-    // the callback contains the connectionId (used to identify the client) and the outputFileName of this workitem
-    const callbackUrl = `${config.credentials.webhook_url}/api/aps/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}`;
     const workItemSpec = {
         activityId: activityName,
         arguments: {
             inputFile: inputFileArgument,
             inputJson: inputJsonArgument,
             outputFile: outputFileArgument,
-            onComplete: {
-                verb: dav3.Verb.post,
-                url: callbackUrl
-            }
         }
     };
     let workItemStatus = null;
     try {
         const api = await Utils.dav3API(req.oauth_token);
         workItemStatus = await api.createWorkItem(workItemSpec);
+        monitorWorkItem(req.oauth_client, req.oauth_token, workItemStatus.id, browerConnectionId, outputFileNameOSS, inputFileNameOSS);
     } catch (ex) {
         console.error(ex);
         return (res.status(500).json({
@@ -596,6 +591,66 @@ router.post('/aps/designautomation/workitems', multer({
         workItemId: workItemStatus.id
     });
 });
+
+async function monitorWorkItem(oauthClient, oauthToken, workItemId, browerConnectionId, outputFileName, inputFileName) {
+    const id = setInterval(async () => {
+        const api = await Utils.dav3API(oauthToken);
+        const status = await api.getWorkitemStatus(workItemId);
+            
+        try {
+            const socketIO = require('../server').io;
+    
+            // your webhook should return immediately! we can use Hangfire to schedule a job
+            socketIO.to(browerConnectionId).emit('onComplete', status);
+
+            if (status.status == 'pending' || status.status === 'inprogress')
+                return;
+
+            clearInterval(id);
+    
+            http.get(
+                status.reportUrl,
+                response => {
+                    response.setEncoding('utf8');
+                    let rawData = '';
+                    response.on('data', (chunk) => {
+                        rawData += chunk;
+                    });
+                    response.on('end', () => {
+                        socketIO.to(browerConnectionId).emit('onComplete', rawData);
+                    });
+                }
+            );
+    
+            const objectsApi = new ForgeAPI.ObjectsApi();
+            const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
+            if (status.status === 'success') {
+                try {
+                    //create a S3 presigned URL and send to client
+                    let response = await objectsApi.getS3DownloadURL(bucketKey, outputFileName,
+                        { useAcceleration: false, minutesExpiration: 15 },
+                        oauthClient, oauthToken);
+                    socketIO.to(browerConnectionId).emit('downloadResult', response.body.url);
+                } catch (ex) {
+                    console.error(ex);
+                    socketIO.to(browerConnectionId).emit('onComplete', 'Failed to create presigned URL for outputFile.\nYour outputFile is available in your OSS bucket.');
+                }
+            }
+    
+            // delete the input file (we do not need it anymore)
+            try {
+    
+                await objectsApi.deleteObject(bucketKey, inputFileName, oauthClient, oauthToken);
+    
+            } catch (ex) {
+                console.error(ex);
+            }
+    
+        } catch (ex) {
+            console.error(ex);
+        }
+    }, 2000);
+}
 
 /// <summary>
 /// Callback from Design Automation Workitem (onProgress or onComplete)
