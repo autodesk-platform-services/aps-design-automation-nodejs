@@ -592,62 +592,33 @@ router.post('/aps/designautomation/workitems', multer({
     });
 });
 
-async function monitorWorkItem(oauthClient, oauthToken, workItemId, browerConnectionId, outputFileName, inputFileName) {
+async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConnectionId, outputFileName, inputFileName) {
     const id = setInterval(async () => {
-        const api = await Utils.dav3API(oauthToken);
-        const status = await api.getWorkitemStatus(workItemId);
-            
+        const socketIO = require('../server').io;
         try {
-            const socketIO = require('../server').io;
-    
-            // your webhook should return immediately! we can use Hangfire to schedule a job
-            socketIO.to(browerConnectionId).emit('onComplete', status);
-
-            if (status.status == 'pending' || status.status === 'inprogress')
-                return;
-
-            clearInterval(id);
-    
-            http.get(
-                status.reportUrl,
-                response => {
-                    response.setEncoding('utf8');
-                    let rawData = '';
-                    response.on('data', (chunk) => {
-                        rawData += chunk;
-                    });
-                    response.on('end', () => {
-                        socketIO.to(browerConnectionId).emit('onComplete', rawData);
-                    });
-                }
-            );
-    
-            const objectsApi = new ForgeAPI.ObjectsApi();
+            const api = await Utils.dav3API(oauthToken);
+            const status = await api.getWorkitemStatus(workItemId);
             const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
+            const objectsApi = new ForgeAPI.ObjectsApi();
+            socketIO.to(browserConnectionId).emit('onComplete', status);
+            if (status.status == 'pending' || status.status === 'inprogress') {
+                return;
+            }
+            let response = await fetch(status.reportUrl);
+            socketIO.to(browserConnectionId).emit('onComplete', await response.text());
+            clearInterval(id);
             if (status.status === 'success') {
-                try {
-                    //create a S3 presigned URL and send to client
-                    let response = await objectsApi.getS3DownloadURL(bucketKey, outputFileName,
-                        { useAcceleration: false, minutesExpiration: 15 },
-                        oauthClient, oauthToken);
-                    socketIO.to(browerConnectionId).emit('downloadResult', response.body.url);
-                } catch (ex) {
-                    console.error(ex);
-                    socketIO.to(browerConnectionId).emit('onComplete', 'Failed to create presigned URL for outputFile.\nYour outputFile is available in your OSS bucket.');
-                }
+                response = await objectsApi.getS3DownloadURL(bucketKey, outputFileName, { 
+                    useAcceleration: false, minutesExpiration: 15 
+                }, oauthClient, oauthToken);
+                socketIO.to(browserConnectionId).emit('downloadResult', response.body.url);
+            } else {
+                throw new Error('Work item failed...');
             }
-    
-            // delete the input file (we do not need it anymore)
-            try {
-    
-                await objectsApi.deleteObject(bucketKey, inputFileName, oauthClient, oauthToken);
-    
-            } catch (ex) {
-                console.error(ex);
-            }
-    
-        } catch (ex) {
-            console.error(ex);
+            await objectsApi.deleteObject(bucketKey, inputFileName, oauthClient, oauthToken);
+        } catch (err) {
+            console.error(err);
+            socketIO.to(browserConnectionId).emit('onError', err);
         }
     }, 2000);
 }
