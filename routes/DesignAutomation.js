@@ -593,17 +593,17 @@ router.post('/aps/designautomation/workitems', multer({
 });
 
 async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConnectionId, outputFileName, inputFileName) {
-    const checkStatus = async () => {
-        const socketIO = require('../server').io;
-        try {
+    const socketIO = require('../server').io;
+    try {
+        while (true) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
             const api = await Utils.dav3API(oauthToken);
             const status = await api.getWorkitemStatus(workItemId);
             const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
             const objectsApi = new ForgeAPI.ObjectsApi();
             socketIO.to(browserConnectionId).emit('onComplete', status);
             if (status.status == 'pending' || status.status === 'inprogress') {
-                setTimeout(checkStatus, 2000);
-                return;
+                continue;
             }
             let response = await fetch(status.reportUrl);
             socketIO.to(browserConnectionId).emit('onComplete', await response.text());
@@ -616,13 +616,12 @@ async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConne
                 throw new Error('Work item failed...');
             }
             await objectsApi.deleteObject(bucketKey, inputFileName, oauthClient, oauthToken);
-        } catch (err) {
-            console.error(err);
-            socketIO.to(browserConnectionId).emit('onError', err);
+            return;
         }
-    };
-
-    setTimeout(checkStatus, 2000);
+    } catch (err) {
+        console.error(err);
+        socketIO.to(browserConnectionId).emit('onError', err);
+    }
 }
 
 /// <summary>
