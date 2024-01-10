@@ -568,24 +568,19 @@ router.post('/aps/designautomation/workitems', multer({
     };
 
     // prepare & submit workitem
-    // the callback contains the connectionId (used to identify the client) and the outputFileName of this workitem
-    const callbackUrl = `${config.credentials.webhook_url}/api/aps/callback/designautomation?id=${browerConnectionId}&outputFileName=${outputFileNameOSS}&inputFileName=${inputFileNameOSS}`;
     const workItemSpec = {
         activityId: activityName,
         arguments: {
             inputFile: inputFileArgument,
             inputJson: inputJsonArgument,
             outputFile: outputFileArgument,
-            onComplete: {
-                verb: dav3.Verb.post,
-                url: callbackUrl
-            }
         }
     };
     let workItemStatus = null;
     try {
         const api = await Utils.dav3API(req.oauth_token);
         workItemStatus = await api.createWorkItem(workItemSpec);
+        monitorWorkItem(req.oauth_client, req.oauth_token, workItemStatus.id, browerConnectionId, outputFileNameOSS, inputFileNameOSS);
     } catch (ex) {
         console.error(ex);
         return (res.status(500).json({
@@ -597,64 +592,37 @@ router.post('/aps/designautomation/workitems', multer({
     });
 });
 
-/// <summary>
-/// Callback from Design Automation Workitem (onProgress or onComplete)
-/// </summary>
-router.post('/aps/callback/designautomation', async /*OnCallback*/(req, res) => {
-    // your webhook should return immediately! we could use Hangfire to schedule a job instead
-    // ALWAYS return ok (200)
-    res.status(200).end();
-
+async function monitorWorkItem(oauthClient, oauthToken, workItemId, browserConnectionId, outputFileName, inputFileName) {
+    const socketIO = require('../server').io;
     try {
-        const socketIO = require('../server').io;
-
-        // your webhook should return immediately! we can use Hangfire to schedule a job
-        const bodyJson = req.body;
-        socketIO.to(req.query.id).emit('onComplete', bodyJson);
-
-        http.get(
-            bodyJson.reportUrl,
-            response => {
-                //socketIO.to(req.query.id).emit('onComplete', response);
-                response.setEncoding('utf8');
-                let rawData = '';
-                response.on('data', (chunk) => {
-                    rawData += chunk;
-                });
-                response.on('end', () => {
-                    socketIO.to(req.query.id).emit('onComplete', rawData);
-                });
+        while (true) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const api = await Utils.dav3API(oauthToken);
+            const status = await api.getWorkitemStatus(workItemId);
+            const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
+            const objectsApi = new ForgeAPI.ObjectsApi();
+            socketIO.to(browserConnectionId).emit('onComplete', status);
+            if (status.status == 'pending' || status.status === 'inprogress') {
+                continue;
             }
-        );
-
-        const objectsApi = new ForgeAPI.ObjectsApi();
-        const bucketKey = Utils.NickName.toLowerCase() + '-designautomation';
-        if (bodyJson.status === 'success') {
-            try {
-                //create a S3 presigned URL and send to client
-                let response = await objectsApi.getS3DownloadURL(bucketKey, req.query.outputFileName,
-                    { useAcceleration: false, minutesExpiration: 15 },
-                    req.oauth_client, req.oauth_token);
-                socketIO.to(req.query.id).emit('downloadResult', response.body.url);
-            } catch (ex) {
-                console.error(ex);
-                socketIO.to(req.query.id).emit('onComplete', 'Failed to create presigned URL for outputFile.\nYour outputFile is available in your OSS bucket.');
+            let response = await fetch(status.reportUrl);
+            socketIO.to(browserConnectionId).emit('onComplete', await response.text());
+            if (status.status === 'success') {
+                response = await objectsApi.getS3DownloadURL(bucketKey, outputFileName, { 
+                    useAcceleration: false, minutesExpiration: 15 
+                }, oauthClient, oauthToken);
+                socketIO.to(browserConnectionId).emit('downloadResult', response.body.url);
+            } else {
+                throw new Error('Work item failed...');
             }
+            await objectsApi.deleteObject(bucketKey, inputFileName, oauthClient, oauthToken);
+            return;
         }
-
-        // delete the input file (we do not need it anymore)
-        try {
-
-            await objectsApi.deleteObject(bucketKey, req.query.inputFileName, req.oauth_client, req.oauth_token);
-
-        } catch (ex) {
-            console.error(ex);
-        }
-
-    } catch (ex) {
-        console.error(ex);
+    } catch (err) {
+        console.error(err);
+        socketIO.to(browserConnectionId).emit('onError', err);
     }
-});
+}
 
 /// <summary>
 /// Clear the accounts (for debugging purpouses)
