@@ -85,7 +85,7 @@ Here is the launch configuration generated for Node.js debugging
             "program": "${workspaceFolder}/start.js",
             "env": {
                 "APS_CLIENT_ID": "your clientid here",
-                "APS_CLIENT_SECRET": "your client secret here",
+                "APS_CLIENT_SECRET": "your client secret here"
             }
         }
     ]
