@@ -525,7 +525,7 @@ router.post('/aps/designautomation/workitems', multer({
     const widthParam = parseFloat(workItemData.width);
     const heigthParam = parseFloat(workItemData.height);
     const activityName = `${Utils.NickName}.${workItemData.activityName}`;
-    const browerConnectionId = workItemData.browerConnectionId;
+    const browserConnectionId = workItemData.browserConnectionId;
 
     // save the file on the server
     const ContentRootPath = _path.resolve(_path.join(__dirname, '../..'));
@@ -580,7 +580,7 @@ router.post('/aps/designautomation/workitems', multer({
     try {
         const api = await Utils.dav3API(req.oauth_token);
         workItemStatus = await api.createWorkItem(workItemSpec);
-        monitorWorkItem(req.oauth_client, req.oauth_token, workItemStatus.id, browerConnectionId, outputFileNameOSS, inputFileNameOSS);
+        monitorWorkItem(req.oauth_client, req.oauth_token, workItemStatus.id, browserConnectionId, outputFileNameOSS, inputFileNameOSS);
     } catch (ex) {
         console.error(ex);
         return (res.status(500).json({
